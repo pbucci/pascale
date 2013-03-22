@@ -43,20 +43,31 @@ int size = 2;
 // The number of frames since last sample
 int sample;
 // The number of frames before next sample
-int sampleRate = 10;
+int sampleRate = 30;
 // X/Y position of blob last sample
 float blobX,blobY;
 // Threshold of speed
-float speedThreshold = 0.7;
+float speedThreshold = 0.1;
+// Counts since last activation
+int onCounter;
+// Number before since next activation
+int onCount = 10; // should hold for _ frames
+// Crops the blob tracking area
+float cropLeft = 0;
+float cropRight = 1000000.0; // might not actually depend on displayWidth, so play with this
 
 boolean goingForward;
 boolean primaryPlaying;
 
 float distance = 100.0;
-float xThreshold = 75.0;
+float xThreshold = 90.0;
 
+////////////////////////////////////////////////////////////////////////
+// SETUP
+////////////////////////////////////////////////////////////////////////
 void setup() {
-  size(1280,720);
+  size(displayWidth,displayHeight);
+  background(0);
   frameRate(30);
   
   p1   = new PVideo(0, "A_video1.mov");
@@ -98,9 +109,13 @@ void setup() {
   img = new PImage(80,60);
   theBlobDetection = new BlobDetection(img.width, img.height);
   theBlobDetection.setPosDiscrimination(true);
-  theBlobDetection.setThreshold(0.1f); // will detect bright areas whose luminosity > 0.2f;
+  theBlobDetection.setThreshold(0.2f); // will detect bright areas whose luminosity > 0.2f;
   theBlobDetection.setBlobMaxNumber(1); 
 }
+
+////////////////////////////////////////////////////////////////////////
+// DRAW
+////////////////////////////////////////////////////////////////////////
 
 void draw() {
    if(!playlist[current].isPlaying() && primaryPlaying) {
@@ -110,15 +125,10 @@ void draw() {
    checkBlob();
 }
 
-void mousePressed() {
- if (primaryPlaying) { 
-  switchVideos();
- }
-}
 
-void mouseReleased() {
-  switchBack();
-}
+////////////////////////////////////////////////////////////////////////
+// SETUP
+////////////////////////////////////////////////////////////////////////
 
 void checkBlob() {
   if (newFrame)
@@ -129,11 +139,13 @@ void checkBlob() {
         0, 0, img.width, img.height);
     fastblur(img, 2);
     theBlobDetection.computeBlobs(img.pixels);
-    //drawBlobsAndEdges(true,true);
+    drawBlobsAndEdges(true,true);
   }
 }
 
+////////////////////////////////////////////////////////////////////////
 // Effects : Switches videos from B stream to A stream
+////////////////////////////////////////////////////////////////////////
 void switchBack() {
    int index = playlist[current].index;
 
@@ -156,7 +168,9 @@ void switchBack() {
    primaryPlaying = true;
 }
 
+////////////////////////////////////////////////////////////////////////
 // Effects : Switches videos from A stream to B stream
+////////////////////////////////////////////////////////////////////////
 void switchVideos() {
   float where = playlist[current].distanceFromLeft();
   int index = playlist[current].index;
@@ -173,19 +187,26 @@ void switchVideos() {
     goingForward = false;
     playlist[current].stop();
     blist[index].play();
-    //blist[index].jump(blist[index].startAt(where));
   }
 }
 
-// Effects : Updates the movie frame when a new frame
-//         : is available
+////////////////////////////////////////////////////////////////////////
+// Effects : Updates the movie frame when a new frame is available
+////////////////////////////////////////////////////////////////////////
 void movieEvent(Movie m) {
   m.read();
+  // (displayWidth - videoWidth)/2
+  // For Pascale:
+  // Example:
+  // Your video is 1920px across. Write:
+  // int offsetX = (displayWidth - 1920)/2;
+  // image(m,offsetX,0);
   image(m,0,0);
 }
 
-// Effects : Stops the current video and plays the next
-//         : on the playlist.
+////////////////////////////////////////////////////////////////////////
+// Effects : Stops the current video and plays the next on the playlist.
+////////////////////////////////////////////////////////////////////////
 void playNext() {
   playlist[current].stop();
   // if we're at the end of the playlist, start
@@ -199,7 +220,9 @@ void playNext() {
   playlist[current].play();
 }
 
+////////////////////////////////////////////////////////////////////////
 // Samples frame count
+////////////////////////////////////////////////////////////////////////
 void sample() {
  if (sample < sampleRate) {
      sample++;
@@ -208,27 +231,44 @@ void sample() {
      sampleSpeed();
      sample = 0;
    } 
+   if (onCounter < onCount) {
+     onCounter++;
+   }
 }
 
+////////////////////////////////////////////////////////////////////////
 // Samples speed of blob
+////////////////////////////////////////////////////////////////////////
 void sampleSpeed() {
   float newX = getBlobX();
-  float newY = getBlobY();
-  float dist = sqrt((blobX*blobX) + (blobY*blobY));
+  //float newY = getBlobY();
+  // float dist = newX - blobX; // user can only activate walking left to right
+  // float dist = blobX - newX; // user can only activate walking right to left
+  float dist = abs(blobX - newX);
+  
   println(dist);
-  if (dist > speedThreshold && primaryPlaying) {
-    switchVideos();
-    println("This is where we switch");
+  
+  if (dist > speedThreshold && newX > cropLeft && newX < cropRight) {
+    onCounter = 0;
+    if (primaryPlaying) {
+      switchVideos();
+      println("This is where we switch");
+    }
+    else if (!alist[current].isPlaying() && !blist[current].isPlaying()) {
+    blist[current].play();
+    goingForward = false;
+    }
   }
-  else if (!primaryPlaying && dist < speedThreshold) {
+  else if (!primaryPlaying && onCounter >= onCount) {
     println("This is where we switch BACK");
     switchBack();
   }
-  
   blobX = newX;
-  blobY = newY;
 }
 
+////////////////////////////////////////////////////////////////////////
+// Unpacks blob object to get x-value of centre 
+////////////////////////////////////////////////////////////////////////
 float getBlobX() {
   float x = 0;
   Blob b;
@@ -239,89 +279,18 @@ float getBlobX() {
   return x;
 }
 
-float getBlobY() {
-  float y = 0;
-  Blob b;
-  b = theBlobDetection.getBlob(0);
-  if (b != null) {
-    y = b.y;
-  }
-  return y;
+////////////////////////////////////////////////////////////////////////
+// captureEvent()
+////////////////////////////////////////////////////////////////////////
+void captureEvent(Capture cam)
+{
+  cam.read();
+  newFrame = true;
 }
 
-
-// PVideo extends the built-in Movie object
-class PVideo extends Movie {
-  // Member fields  
-  int index;
-  float time;
-  float speed;
-  float speedInv;
-  
-  // Constuctor
-  PVideo(int i, String f) {
-    super(thisSketch,f);
-    
-    // For some reason, this.duration() returns 0
-    // if the movie is not playing, despite the 
-    // processing.org documentation, so on
-    // instatiation, briefly start and stop to get
-    // duration.
-    this.play();
-    time = this.duration();
-    this.stop();
-    
-    // Index is for a/blist arrays
-    index = i;
-    
-    // To switch between videos, we need a simple
-    // way of tracking position
-    speed = distance/time;
-    speedInv = time/distance;
-    
-  }
-  
-  // Effects : Looks into the superclass protected field
-  // Returns : True if the movie is playing
-  boolean isPlaying() {
-    return super.playing;
-  }
-  
-  // Effects : Determines whether an a or b video should
-  //         : be played.
-  // Returns : True if position is < xThreshold, which is
-  //         : 3/4 distance.
-  boolean isForward() {
-    float position = this.distanceFromLeft();
-    println("Position is: " + position);
-    
-    if (position < xThreshold) {
-      return true;
-    }
-    else {
-      return false;
-    }
-  }
-  
-  // Effects : checks current distance from left side of frame
-  //         : by (speed*currentTimeCode), by the simple formula
-  //         : borrowed from physics (speed = distance/time)
-  // Returns : Distance from left side of frame in meters 
-  float distanceFromLeft() {    
-    return (this.speed*this.time());
-  }
-  
-  // Returns : The distance in meters from the left side of
-  //         : the frame that we should the new video at 
-  float startAt(float d) {
-    return (d*this.speedInv);
-  }
-}
-
-
-// ==================================================
+////////////////////////////////////////////////////////////////////////
 // drawBlobsAndEdges()
-// ==================================================
+////////////////////////////////////////////////////////////////////////
 void drawBlobsAndEdges(boolean drawBlobs, boolean drawEdges)
 {
   noFill();
@@ -365,11 +334,11 @@ void drawBlobsAndEdges(boolean drawBlobs, boolean drawEdges)
       }
 }
 
-// ==================================================
+////////////////////////////////////////////////////////////////////////
 // Super Fast Blur v1.1
 // by Mario Klingemann 
 // <http://incubator.quasimondo.com>
-// ==================================================
+////////////////////////////////////////////////////////////////////////
 void fastblur(PImage img,int radius)
 {
  if (radius<1){
@@ -453,11 +422,89 @@ void fastblur(PImage img,int radius)
   }
 }
 
-// ==================================================
-// captureEvent()
-// ==================================================
-void captureEvent(Capture cam)
-{
-  cam.read();
-  newFrame = true;
+////////////////////////////////////////////////////////////////////////
+// PVideo extends the built-in Movie object
+////////////////////////////////////////////////////////////////////////
+class PVideo extends Movie {
+  // Member fields  
+  int index;
+  float time;
+  float speed;
+  float speedInv;
+  
+  // Constuctor
+  PVideo(int i, String f) {
+    super(thisSketch,f);
+    
+    // For some reason, this.duration() returns 0
+    // if the movie is not playing, despite the 
+    // processing.org documentation, so on
+    // instatiation, briefly start and stop to get
+    // duration.
+    this.play();
+    time = this.duration();
+    this.stop();
+    
+    // Index is for a/blist arrays
+    index = i;
+    
+    // To switch between videos, we need a simple
+    // way of tracking position
+    speed = distance/time;
+    speedInv = time/distance;
+    
+  }
+  
+  ////////////////////////////////////////////////////////////////////////
+  // Effects : Looks into the superclass protected field
+  // Returns : True if the movie is playing
+  ////////////////////////////////////////////////////////////////////////
+  boolean isPlaying() {
+    return super.playing;
+  }
+  
+  ////////////////////////////////////////////////////////////////////////
+  // Effects : Determines whether an a or b video should be played.
+  // Returns : True if position is < xThreshold, which is 3/4 distance.
+  ////////////////////////////////////////////////////////////////////////
+  boolean isForward() {
+    float position = this.distanceFromLeft();
+    println("Position is: " + position);
+    
+    if (position < xThreshold) {
+      return true;
+    }
+    else {
+      return false;
+    }
+  }
+  ////////////////////////////////////////////////////////////////////////
+  // Effects : checks current distance from left side of frame
+  //         : by (speed*currentTimeCode), by the simple formula
+  //         : borrowed from physics (speed = distance/time)
+  // Returns : Distance from left side of frame in meters
+  ////////////////////////////////////////////////////////////////////////
+  float distanceFromLeft() {    
+    return (this.speed*this.time());
+  }
+  
+  // Returns : The distance in meters from the left side of
+  //         : the frame that we should the new video at 
+  float startAt(float d) {
+    return (d*this.speedInv);
+  }
+}
+
+////////////////////////////////////////////////////////////////////////
+// TEST FUNCTIONS IF NO WEBCAM ATTACHED
+////////////////////////////////////////////////////////////////////////
+
+void mousePressed() {
+ if (primaryPlaying) { 
+  switchVideos();
+ }
+}
+
+void mouseReleased() {
+  switchBack();
 }
