@@ -4,24 +4,21 @@
 ////////////////////////////////////////////////////////////////////////
 // Pascale 0.1                                                        //
 // This program switches between a number of videos depending on the  //
-// speed of the viewer. Produced for the Emily Carr MAA exhibtion     //
+// movement of the viewer. Produced for the Emily Carr MAA exhibtion  //
 // held in March/April 2013.                                          //
 //                                                                    //
 // Author : Paul Bucci                                                //
 // Website : paulbucci.ca                                             //
 //                                                                    //
-// All blob detection code from:                                      //
-// http://www.v3ga.net/processing/BlobDetection/index-page-home.html  //
+// Motion detection from Daniel Shiffman at:                          //
+//   http://www.learningprocessing.com/                               //
 ////////////////////////////////////////////////////////////////////////
 
 import processing.video.*;
-import blobDetection.*;
 
-Capture cam;
-BlobDetection theBlobDetection;
-PImage img;
-boolean newFrame=false;
-
+Capture video;
+// Previous Frame
+PImage prevFrame;
 PApplet thisSketch = this;
 
 PVideo[] playlist;
@@ -36,25 +33,111 @@ PVideo p2;
 PVideo p2_a;
 PVideo p2_b;
 
+PVideo p3;
+PVideo p3_a;
+PVideo p3_b;
+
+PVideo p4;
+PVideo p4_a;
+PVideo p4_b;
+
+PVideo p5;
+PVideo p5_a;
+PVideo p5_b;
+
+PVideo p6;
+PVideo p6_a;
+PVideo p6_b;
+
+PVideo p7;
+PVideo p7_a;
+PVideo p7_b;
+
+PVideo p8;
+PVideo p8_a;
+PVideo p8_b;
+
+PVideo p9;
+PVideo p9_a;
+PVideo p9_b;
+
+PVideo p10;
+PVideo p10_a;
+PVideo p10_b;
+
+PVideo p11;
+PVideo p11_a;
+PVideo p11_b;
+
+PVideo p12;
+PVideo p12_a;
+PVideo p12_b;
+
+PVideo p13;
+PVideo p13_a;
+PVideo p13_b;
+
+PVideo p14;
+PVideo p14_a;
+PVideo p14_b;
+
+PVideo p15;
+PVideo p15_a;
+PVideo p15_b;
+
+PVideo p16;
+PVideo p16_a;
+PVideo p16_b;
+
+PVideo p17;
+PVideo p17_a;
+PVideo p17_b;
+
+PVideo p18;
+PVideo p18_a;
+PVideo p18_b;
+
+PVideo p19;
+PVideo p19_a;
+PVideo p19_b;
+
+PVideo p20;
+PVideo p20_a;
+PVideo p20_b;
+
+
 // The index of the current A list video being played
 int current;
 // The size of all playlists
-int size = 2;
+int size = 20;
+
 // The number of frames since last sample
 int sample;
 // The number of frames before next sample
-int sampleRate = 30;
-// X/Y position of blob last sample
-float blobX,blobY;
-// Threshold of speed
-float speedThreshold = 0.1;
+int sampleRate = 20;
+
+// The refresh rate of the program
+int framerate  = 30;
+
 // Counts since last activation
-int onCounter;
+int onCounter = 0;
 // Number before since next activation
-int onCount = 10; // should hold for _ frames
-// Crops the blob tracking area
-float cropLeft = 0;
-float cropRight = 1000000.0; // might not actually depend on displayWidth, so play with this
+int onCount = 60; // should hold for _ frames
+
+// How different must a pixel be to be a "motion" pixel
+float pixelThreshold = 13;
+// How much of the picture should change before we switch
+int motionThreshold = 17;
+
+// Size of the webcam image. Smaller is faster.
+int videoWidth = 32;
+int videoHeight = 24;
+
+// Crop values need to be in the range of the video capture size
+int CROP_RIGHT = 26;
+int CROP_LEFT = 6;
+int CROP_TOP = 0;
+int CROP_BOTTOM = videoHeight;
 
 boolean goingForward;
 boolean primaryPlaying;
@@ -66,9 +149,12 @@ float xThreshold = 90.0;
 // SETUP
 ////////////////////////////////////////////////////////////////////////
 void setup() {
+String[] cameras = Capture.list();
+println(cameras[1]);
+
   size(displayWidth,displayHeight);
   background(0);
-  frameRate(30);
+  frameRate(framerate);
   
   p1   = new PVideo(0, "A_video1.mov");
   p1_a = new PVideo(0, "B_video1_a.mov");
@@ -77,69 +163,191 @@ void setup() {
   p2   = new PVideo(1, "A_video2.mov");
   p2_a = new PVideo(1, "B_video2_a.mov");
   p2_b = new PVideo(1, "B_video2_b.mov");
+  
+  p3   = new PVideo(2, "A_video3.mov");
+  p3_a = new PVideo(2, "B_video3_a.mov");
+  p3_b = new PVideo(2, "B_video3_b.mov");
+  
+  p4   = new PVideo(3, "A_video4.mov");
+  p4_a = new PVideo(3, "B_video4_a.mov");
+  p4_b = new PVideo(3, "B_video4_b.mov");
+  
+  p5   = new PVideo(4, "A_video5.mov");
+  p5_a = new PVideo(4, "B_video5_a.mov");
+  p5_b = new PVideo(4, "B_video5_b.mov");
+  
+  p6   = new PVideo(5, "A_video6.mov");
+  p6_a = new PVideo(5, "B_video6_a.mov");
+  p6_b = new PVideo(5, "B_video6_b.mov");
+  
+  p7   = new PVideo(6, "A_video7.mov");
+  p7_a = new PVideo(6, "B_video7_a.mov");
+  p7_b = new PVideo(6, "B_video7_b.mov");
+  
+  p8   = new PVideo(7, "A_video8.mov");
+  p8_a = new PVideo(7, "B_video8_a.mov");
+  p8_b = new PVideo(7, "B_video8_b.mov");
+  
+  p9   = new PVideo(8, "A_video9.mov");
+  p9_a = new PVideo(8, "B_video9_a.mov");
+  p9_b = new PVideo(8, "B_video9_b.mov");
+  
+  p10   = new PVideo(9, "A_video10.mov");
+  p10_a = new PVideo(9, "B_video10_a.mov");
+  p10_b = new PVideo(9, "B_video10_b.mov");
+  
+  p11   = new PVideo(10, "A_video11.mov");
+  p11_a = new PVideo(10, "B_video11_a.mov");
+  p11_b = new PVideo(10, "B_video11_b.mov");
+  
+  p12   = new PVideo(11, "A_video12.mov");
+  p12_a = new PVideo(11, "B_video12_a.mov");
+  p12_b = new PVideo(11, "B_video12_b.mov");
+  
+  p13   = new PVideo(12, "A_video13.mov");
+  p13_a = new PVideo(12, "B_video13_a.mov");
+  p13_b = new PVideo(12, "B_video13_b.mov");
+  
+  p14   = new PVideo(13, "A_video14.mov");
+  p14_a = new PVideo(13, "B_video14_a.mov");
+  p14_b = new PVideo(13, "B_video14_b.mov");
+  
+  p15   = new PVideo(14, "A_video15.mov");
+  p15_a = new PVideo(14, "B_video15_a.mov");
+  p15_b = new PVideo(14, "B_video15_b.mov");
+  
+  p16   = new PVideo(15, "A_video16.mov");
+  p16_a = new PVideo(15, "B_video16_a.mov");
+  p16_b = new PVideo(15, "B_video16_b.mov");
+  
+  p17   = new PVideo(16, "A_video17.mov");
+  p17_a = new PVideo(16, "B_video17_a.mov");
+  p17_b = new PVideo(16, "B_video17_b.mov");
+  
+  p18   = new PVideo(17, "A_video18.mov");
+  p18_a = new PVideo(17, "B_video18_a.mov");
+  p18_b = new PVideo(17, "B_video18_b.mov");
+  
+  p19   = new PVideo(18, "A_video19.mov");
+  p19_a = new PVideo(18, "B_video19_a.mov");
+  p19_b = new PVideo(18, "B_video19_b.mov");
+  
+  p20   = new PVideo(19, "A_video20.mov");
+  p20_a = new PVideo(19, "B_video20_a.mov");
+  p20_b = new PVideo(19, "B_video20_b.mov");
+  
 
   playlist = new PVideo[size];
   playlist[0] = p1;
   playlist[1] = p2;
+  playlist[2] = p3;
+  playlist[3] = p4;
+  playlist[4] = p5;
+  playlist[5] = p6;
+  playlist[6] = p7;
+  playlist[7] = p8;
+  playlist[8] = p9;
+  playlist[9] = p10;
+  playlist[10] = p11;
+  playlist[11] = p12;
+  playlist[12] = p13;
+  playlist[13] = p14;
+  playlist[14] = p15;
+  playlist[15] = p16;
+  playlist[16] = p17;
+  playlist[17] = p18;
+  playlist[18] = p19;
+  playlist[19] = p20;
+
   
   alist = new PVideo[size];
   alist[0] = p1_a;
   alist[1] = p2_a;
-  
+  alist[2] = p3_a;
+  alist[3] = p4_a;
+  alist[4] = p5_a;
+  alist[5] = p6_a;
+  alist[6] = p7_a;
+  alist[7] = p8_a;
+  alist[8] = p9_a;
+  alist[9] = p10_a;
+  alist[10] = p11_a;
+  alist[11] = p12_a;
+  alist[12] = p13_a;
+  alist[13] = p14_a;
+  alist[14] = p15_a;
+  alist[15] = p16_a;
+  alist[16] = p17_a;
+  alist[17] = p18_a;
+  alist[18] = p19_a;
+  alist[19] = p20_a;
+
   blist = new PVideo[size];
   blist[0] = p1_b;
   blist[1] = p2_b;
+  blist[2] = p3_b;
+  blist[3] = p4_b;
+  blist[4] = p5_b;
+  blist[5] = p6_b;
+  blist[6] = p7_b;
+  blist[7] = p8_b;
+  blist[8] = p9_b;
+  blist[9] = p10_b;
+  blist[10] = p11_b;
+  blist[11] = p12_b;
+  blist[12] = p13_b;
+  blist[13] = p14_b;
+  blist[14] = p15_b;
+  blist[15] = p16_b;
+  blist[16] = p17_b;
+  blist[17] = p18_b;
+  blist[18] = p19_b;
+  blist[19] = p20_b;
   
   current = 0;
   sample = 0;
-  blobX = 0;
-  blobY = 0;
+  
   playlist[0].play();
   
   primaryPlaying = true;
   goingForward = true;
   
-  //Blob setup
-    cam = new Capture(this, 40*4, 30*4, 15);
-        // Comment the following line if you use Processing 1.5
-        cam.start();
-        
-  // BlobDetection
-  // img which will be sent to detection (a smaller copy of the cam frame);
-  img = new PImage(80,60);
-  theBlobDetection = new BlobDetection(img.width, img.height);
-  theBlobDetection.setPosDiscrimination(true);
-  theBlobDetection.setThreshold(0.2f); // will detect bright areas whose luminosity > 0.2f;
-  theBlobDetection.setBlobMaxNumber(1); 
+  video = new Capture(this, videoWidth, videoHeight, "HP Webcam HD 3310", framerate);
+  // Create an empty image the same size as the video
+  prevFrame = createImage(video.width,video.height,ALPHA);
+  video.start();
 }
 
 ////////////////////////////////////////////////////////////////////////
 // DRAW
 ////////////////////////////////////////////////////////////////////////
-
 void draw() {
    if(!playlist[current].isPlaying() && primaryPlaying) {
      playNext();
    }
    sample();
-   checkBlob();
+   int diffCount = detectMotion();
+   checkSwitch(diffCount);
 }
 
-
 ////////////////////////////////////////////////////////////////////////
-// SETUP
+// checkSwitch : calls either switchVideo() or switchBack()
 ////////////////////////////////////////////////////////////////////////
-
-void checkBlob() {
-  if (newFrame)
-  {
-    newFrame = false;
-    //image(cam,0,0,width,height);
-    img.copy(cam, 0, 0, cam.width, cam.height, 
-        0, 0, img.width, img.height);
-    fastblur(img, 2);
-    theBlobDetection.computeBlobs(img.pixels);
-    drawBlobsAndEdges(true,true);
+void checkSwitch(int diffCount) {
+  if (diffCount > motionThreshold) {
+    onCounter = 0;
+    if (primaryPlaying) {
+      switchVideos();
+//      println("This is where we switch");
+    }
+    else if (!alist[current].isPlaying() && !blist[current].isPlaying()) {
+    blist[current].play();
+    goingForward = false;
+    }
+  }
+  else if (!primaryPlaying && onCounter >= onCount) {
+//    println("This is where we switch BACK");
+    switchBack();
   }
 }
 
@@ -194,7 +402,7 @@ void switchVideos() {
 // Effects : Updates the movie frame when a new frame is available
 ////////////////////////////////////////////////////////////////////////
 void movieEvent(Movie m) {
-  m.read();
+   m.read();
   // (displayWidth - videoWidth)/2
   // For Pascale:
   // Example:
@@ -221,14 +429,13 @@ void playNext() {
 }
 
 ////////////////////////////////////////////////////////////////////////
-// Samples frame count
+// Effects : Samples frame count
 ////////////////////////////////////////////////////////////////////////
 void sample() {
  if (sample < sampleRate) {
      sample++;
    }
    else {
-     sampleSpeed();
      sample = 0;
    } 
    if (onCounter < onCount) {
@@ -237,189 +444,44 @@ void sample() {
 }
 
 ////////////////////////////////////////////////////////////////////////
-// Samples speed of blob
+// Effects : checks each pixel for movement, returns count
 ////////////////////////////////////////////////////////////////////////
-void sampleSpeed() {
-  float newX = getBlobX();
-  //float newY = getBlobY();
-  // float dist = newX - blobX; // user can only activate walking left to right
-  // float dist = blobX - newX; // user can only activate walking right to left
-  float dist = abs(blobX - newX);
+int detectMotion() {
+  // Capture video
+  if (video.available()) {
+    // Save previous frame for motion detection!!
+    // Before we read the new frame, we always save the previous frame for comparison!
+    prevFrame.copy(video,0,0,video.width,video.height,0,0,video.width,video.height); 
+    prevFrame.updatePixels();
+    video.read();
+  }
   
-  println(dist);
-  
-  if (dist > speedThreshold && newX > cropLeft && newX < cropRight) {
-    onCounter = 0;
-    if (primaryPlaying) {
-      switchVideos();
-      println("This is where we switch");
-    }
-    else if (!alist[current].isPlaying() && !blist[current].isPlaying()) {
-    blist[current].play();
-    goingForward = false;
-    }
-  }
-  else if (!primaryPlaying && onCounter >= onCount) {
-    println("This is where we switch BACK");
-    switchBack();
-  }
-  blobX = newX;
-}
-
-////////////////////////////////////////////////////////////////////////
-// Unpacks blob object to get x-value of centre 
-////////////////////////////////////////////////////////////////////////
-float getBlobX() {
-  float x = 0;
-  Blob b;
-  b = theBlobDetection.getBlob(0);
-  if (b != null) {
-    x = b.x;
-  }
-  return x;
-}
-
-////////////////////////////////////////////////////////////////////////
-// captureEvent()
-////////////////////////////////////////////////////////////////////////
-void captureEvent(Capture cam)
-{
-  cam.read();
-  newFrame = true;
-}
-
-////////////////////////////////////////////////////////////////////////
-// drawBlobsAndEdges()
-////////////////////////////////////////////////////////////////////////
-void drawBlobsAndEdges(boolean drawBlobs, boolean drawEdges)
-{
-  noFill();
-  Blob b;
-  EdgeVertex eA,eB;
-  for (int n=0 ; n<theBlobDetection.getBlobNb() ; n++)
-  {
-    b=theBlobDetection.getBlob(n);
-    if (b!=null)
-    {
-      // Edges
-      if (drawEdges)
-      {
-        strokeWeight(3);
-        stroke(0,255,0);
-        for (int m=0;m<b.getEdgeNb();m++)
-        {
-          eA = b.getEdgeVertexA(m);
-          eB = b.getEdgeVertexB(m);
-          if (eA !=null && eB !=null)
-            line(
-              eA.x*width, eA.y*height, 
-              eB.x*width, eB.y*height
-              );
-        }
+  video.loadPixels();
+  prevFrame.loadPixels();
+  int diffCount = 0;
+  // Begin loop to walk through every pixel
+  for (int x = CROP_LEFT; x < CROP_RIGHT; x ++ ) {
+    for (int y = CROP_TOP; y < CROP_BOTTOM; y ++ ) {
+      
+      int loc = x + y*video.width;            // Step 1, what is the 1D pixel location
+      color current = video.pixels[loc];      // Step 2, what is the current color
+      color previous = prevFrame.pixels[loc]; // Step 3, what is the previous color
+      
+      // Step 4, compare colors (previous vs. current)
+      float r1 = red(current); float g1 = green(current); float b1 = blue(current);
+      float r2 = red(previous); float g2 = green(previous); float b2 = blue(previous);
+      float diff = dist(r1,g1,b1,r2,g2,b2);
+      
+      // Step 5, How different are the colors?
+      // If the color at that pixel has changed, then there is motion at that pixel.
+      if (diff > pixelThreshold) { 
+        // A pixel changed, add it to the count.
+        diffCount++;
       }
-
-      // Blobs
-      if (drawBlobs)
-      {
-        strokeWeight(1);
-        stroke(255,0,0);
-        rect(
-          b.xMin*width,b.yMin*height,
-          b.w*width,b.h*height
-          );
-      }
-
-    }
-
-      }
-}
-
-////////////////////////////////////////////////////////////////////////
-// Super Fast Blur v1.1
-// by Mario Klingemann 
-// <http://incubator.quasimondo.com>
-////////////////////////////////////////////////////////////////////////
-void fastblur(PImage img,int radius)
-{
- if (radius<1){
-    return;
-  }
-  int w=img.width;
-  int h=img.height;
-  int wm=w-1;
-  int hm=h-1;
-  int wh=w*h;
-  int div=radius+radius+1;
-  int r[]=new int[wh];
-  int g[]=new int[wh];
-  int b[]=new int[wh];
-  int rsum,gsum,bsum,x,y,i,p,p1,p2,yp,yi,yw;
-  int vmin[] = new int[max(w,h)];
-  int vmax[] = new int[max(w,h)];
-  int[] pix=img.pixels;
-  int dv[]=new int[256*div];
-  for (i=0;i<256*div;i++){
-    dv[i]=(i/div);
-  }
-
-  yw=yi=0;
-
-  for (y=0;y<h;y++){
-    rsum=gsum=bsum=0;
-    for(i=-radius;i<=radius;i++){
-      p=pix[yi+min(wm,max(i,0))];
-      rsum+=(p & 0xff0000)>>16;
-      gsum+=(p & 0x00ff00)>>8;
-      bsum+= p & 0x0000ff;
-    }
-    for (x=0;x<w;x++){
-
-      r[yi]=dv[rsum];
-      g[yi]=dv[gsum];
-      b[yi]=dv[bsum];
-
-      if(y==0){
-        vmin[x]=min(x+radius+1,wm);
-        vmax[x]=max(x-radius,0);
-      }
-      p1=pix[yw+vmin[x]];
-      p2=pix[yw+vmax[x]];
-
-      rsum+=((p1 & 0xff0000)-(p2 & 0xff0000))>>16;
-      gsum+=((p1 & 0x00ff00)-(p2 & 0x00ff00))>>8;
-      bsum+= (p1 & 0x0000ff)-(p2 & 0x0000ff);
-      yi++;
-    }
-    yw+=w;
-  }
-
-  for (x=0;x<w;x++){
-    rsum=gsum=bsum=0;
-    yp=-radius*w;
-    for(i=-radius;i<=radius;i++){
-      yi=max(0,yp)+x;
-      rsum+=r[yi];
-      gsum+=g[yi];
-      bsum+=b[yi];
-      yp+=w;
-    }
-    yi=x;
-    for (y=0;y<h;y++){
-      pix[yi]=0xff000000 | (dv[rsum]<<16) | (dv[gsum]<<8) | dv[bsum];
-      if(x==0){
-        vmin[y]=min(y+radius+1,hm)*w;
-        vmax[y]=max(y-radius,0)*w;
-      }
-      p1=x+vmin[y];
-      p2=x+vmax[y];
-
-      rsum+=r[p1]-r[p2];
-      gsum+=g[p1]-g[p2];
-      bsum+=b[p1]-b[p2];
-
-      yi+=w;
     }
   }
+//  println(diffCount);
+  return diffCount;
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -469,7 +531,7 @@ class PVideo extends Movie {
   ////////////////////////////////////////////////////////////////////////
   boolean isForward() {
     float position = this.distanceFromLeft();
-    println("Position is: " + position);
+//    println("Position is: " + position);
     
     if (position < xThreshold) {
       return true;
@@ -478,6 +540,7 @@ class PVideo extends Movie {
       return false;
     }
   }
+  
   ////////////////////////////////////////////////////////////////////////
   // Effects : checks current distance from left side of frame
   //         : by (speed*currentTimeCode), by the simple formula
@@ -493,18 +556,4 @@ class PVideo extends Movie {
   float startAt(float d) {
     return (d*this.speedInv);
   }
-}
-
-////////////////////////////////////////////////////////////////////////
-// TEST FUNCTIONS IF NO WEBCAM ATTACHED
-////////////////////////////////////////////////////////////////////////
-
-void mousePressed() {
- if (primaryPlaying) { 
-  switchVideos();
- }
-}
-
-void mouseReleased() {
-  switchBack();
 }
